@@ -7,10 +7,10 @@ Gem::Specification.new do |spec|
   spec.name          = "covertrace"
   spec.version       = Covertrace::VERSION
   spec.authors       = ["Guillaume Malette"]
-  spec.email         = ["guillaume@shopify.com"]
+  spec.email         = ["gmalette@gmail.com"]
 
-  spec.summary       = %q{TODO: Write a short summary, because Rubygems requires one.}
-  spec.description   = %q{TODO: Write a longer description or delete this line.}
+  spec.summary       = %q{Covertrace tracks the coverage of individual pieces of code}
+  spec.description   = %q{Covertrace tracks the coverage of individual pieces of code}
   spec.homepage      = "TODO: Put your gem's website or public repo URL here."
   spec.license       = "MIT"
 
