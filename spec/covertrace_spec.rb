@@ -9,20 +9,6 @@ describe Covertrace do
   it 'has a version number' do
     expect(Covertrace::VERSION).not_to be nil
   end
-
-  describe ".trace" do
-    it "yields control" do
-      expect{ |b| described_class.trace(&b) }.to yield_control
-    end
-
-    it "raises if called when tracing" do
-      expect do
-        described_class.trace do
-          described_class.trace{}
-        end
-      end.to raise_error(Covertrace::AlreadyStartedError)
-    end
-  end
 end
 
 describe Covertrace::Tracer do

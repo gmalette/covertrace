@@ -1,3 +1,4 @@
+require "coverage"
 require "covertrace/version"
 
 module Covertrace
@@ -17,16 +18,17 @@ module Covertrace
 
   Tracer = Struct.new(:config) do
     def initialize(config:)
-      @config = config.dup
+      self.config = config.dup
       @result_set = ResultSet.new
     end
 
     def trace(name:, &block)
       value = nil
-      results = Covertrace.trace do
+      results = coverage_tracking do
         value = block.call
       end
-      results = Result.new(@config.filter(results))
+
+      results = Result.new(config.filter(results))
       @result_set.record(name, results)
       value
     end
@@ -45,6 +47,25 @@ module Covertrace
         end
       )
     end
+
+    private
+
+    def coverage_tracking(&block)
+      Coverage.start
+      state_before = Coverage.peek_result
+      block.call
+      state_after = Coverage.peek_result
+      filtered = config.filter(state_after).map do |file_name, coverage_after|
+        coverage_before = state_before.fetch(file_name, [])
+        next [file_name, (0...coverage_after).map { 0 }] if coverage_after == coverage_before
+        diffs = coverage_after.zip(coverage_before).map do |after, before|
+          next if after.nil?
+          after.to_i - before.to_i
+        end
+        [file_name, diffs]
+      end
+      filtered.to_h
+    end
   end
 
   Dependencies = Struct.new(:hash) do
@@ -57,7 +78,12 @@ module Covertrace
     end
 
     def names(file:, line_range:)
-      hash.fetch(file, []).slice(line_range).flatten.uniq
+      hash
+        .fetch(file, [])
+        .drop(line_range.begin)
+        .take(line_range.size)
+        .flatten
+        .uniq
     end
   end
 
@@ -79,16 +105,5 @@ module Covertrace
     def empty?
       coverage.empty?
     end
-  end
-
-  def self.trace(&block)
-    require "coverage"
-    raise AlreadyStartedError, "Covertrace already tracing" if @started
-    @started = true
-    Coverage.start
-    yield
-    Coverage.result
-  ensure
-    @started = false
   end
 end
