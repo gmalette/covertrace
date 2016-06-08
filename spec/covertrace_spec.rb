@@ -20,7 +20,29 @@ describe Covertrace::Tracer do
   describe "#trace" do
     it "returns the value of the expression" do
       mock_coverage_results
-      expect(subject.trace(name: "toto"){ "tutu" }).to eq("tutu")
+      expect(subject.trace(name: "toto") { "tutu" }).to eq("tutu")
+    end
+
+    it "records an empty array if nothing_changed" do
+      mock_empty_coverage_results
+      expect_any_instance_of(Covertrace::ResultSet).to receive(:record).with(
+        "toto",
+        instance_of(Covertrace::Result)
+      ) do |_self, _name, result|
+        expect(result.coverage.values.flatten).to all(be_nil)
+      end
+      subject.trace(name: "toto") { "tutu" }
+    end
+
+    it "records coverage results" do
+      mock_coverage_results
+      expect_any_instance_of(Covertrace::ResultSet).to receive(:record).with(
+        "toto",
+        instance_of(Covertrace::Result)
+      ) do |_self, _name, result|
+        expect(result.coverage.values.flatten).to satisfy { |values| values.any? { |v| v > 0 } }
+      end
+      subject.trace(name: "toto") { "tutu" }
     end
 
     it "yields control" do

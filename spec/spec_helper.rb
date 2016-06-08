@@ -23,4 +23,16 @@ module CoverageHelper
       },
     )
   end
+
+  def mock_empty_coverage_results
+    expect(Coverage).to receive(:start)
+    expect(Coverage).to receive(:peek_result).and_return(
+      {
+        test_class_file_path => test_class_coverage,
+      },
+      {
+        test_class_file_path => test_class_coverage,
+      },
+    )
+  end
 end

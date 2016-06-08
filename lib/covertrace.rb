@@ -57,7 +57,7 @@ module Covertrace
       state_after = Coverage.peek_result
       filtered = config.filter(state_after).map do |file_name, coverage_after|
         coverage_before = state_before.fetch(file_name, [])
-        next [file_name, (0...coverage_after).map { 0 }] if coverage_after == coverage_before
+        next [file_name, coverage_after.map { nil }] if coverage_after == coverage_before
         diffs = coverage_after.zip(coverage_before).map do |after, before|
           next if after.nil?
           after.to_i - before.to_i
