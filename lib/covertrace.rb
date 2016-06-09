@@ -4,6 +4,24 @@ require "unified_diff"
 require "open3"
 
 module Covertrace
+  extend self
+
+  def start(**options)
+    Coverage.start
+    @tracer = Tracer.new(config: Config.new(**options))
+  end
+
+  attr_reader :tracer
+
+  def recorder(&block)
+    @recorders ||= []
+    @recorders << block
+  end
+
+  def record
+    @recorders.each { |recorder| recorder.call(tracer) }
+  end
+
   AlreadyStartedError = Class.new(StandardError)
 
   Config = Struct.new(:filter_proc, :file_mapper_proc) do
