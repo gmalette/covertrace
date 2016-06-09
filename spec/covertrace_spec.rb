@@ -108,7 +108,7 @@ describe Covertrace::Dependencies do
   subject do
     described_class.new(
       hash: {
-        test_class_file_path => test_class_coverage.map.with_index do |coverage, index|
+        test_class_file_path => test_class_coverage.map do |coverage|
           next [] unless coverage.to_i > 0
           ["toto"]
         end,
@@ -124,6 +124,34 @@ describe Covertrace::Dependencies do
     it "returns an empty array if no names are affected" do
       expect(subject.names(file: test_class_file_path, line_range: (4..5))).to eq([])
       expect(subject.names(file: "unexisting file", line_range: (0..3))).to eq([])
+    end
+  end
+
+  describe "#merge" do
+    it "merges with dependency and returns a new object" do
+      other = described_class.new(
+        hash: {
+          "a.rb" => [
+            [],
+            ["titi"],
+          ],
+          test_class_file_path => test_class_coverage.map { ["titi"] },
+        }
+      )
+      expected_for_test_class = test_class_coverage.map do |coverage|
+        result = []
+        result << "toto" if coverage.to_i > 0
+        result << "titi"
+        result
+      end
+      expect(subject.merge(other)).to eq(
+        described_class.new(
+          hash: {
+            test_class_file_path => expected_for_test_class,
+            "a.rb" => [[], ["titi"]],
+          }
+        )
+      )
     end
   end
 end

@@ -86,6 +86,18 @@ module Covertrace
       self.hash = hash
     end
 
+    def merge(other)
+      new_hash = (hash.keys + other.hash.keys).map do |key|
+        lines = hash.fetch(key, [])
+        other_lines = other.hash.fetch(key, [])
+        tests = (0...([lines.length, other_lines.length].max)).map do |line_number|
+          (lines.fetch(line_number, []) + other_lines.fetch(line_number, [])).uniq
+        end
+        [key, tests]
+      end.to_h
+      Dependencies.new(hash: new_hash)
+    end
+
     def names(file:, line_range:)
       hash
         .fetch(file, [])
