@@ -19,7 +19,7 @@ module Covertrace
   end
 
   def record
-    @recorders.each { |recorder| recorder.call(tracer) }
+    @recorders.each { |recorder| recorder.call(tracer.dependencies) }
   end
 
   AlreadyStartedError = Class.new(StandardError)
@@ -131,6 +131,10 @@ module Covertrace
         .take(line_range.size)
         .flatten
         .uniq
+    end
+
+    def to_json
+      hash.to_json
     end
   end
 
