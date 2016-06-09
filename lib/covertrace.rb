@@ -7,13 +7,27 @@ module Covertrace
   AlreadyStartedError = Class.new(StandardError)
 
   Config = Struct.new(:filter_proc, :file_mapper_proc) do
-    def initialize(filter: ->(_){ true }, file_mapper: ->(path) { path })
+    def initialize(root:, filter: default_filter, file_mapper: default_file_mapper)
+      @root = File.join(Pathname.new(root).realpath, "")
+
       self.filter_proc = filter
       self.file_mapper_proc = file_mapper
     end
 
+    def default_filter
+      lambda do |path|
+        path.to_s.start_with?(@root)
+      end
+    end
+
+    def default_file_mapper
+      lambda do |path|
+        path.to_s.sub(@root, "")
+      end
+    end
+
     def filter(file_name)
-        filter_proc.call(file_name)
+      filter_proc.call(file_name)
     end
 
     def map_file_name(file_name)
@@ -117,22 +131,6 @@ module Covertrace
   end
 
   class GitDiffer
-    def initialize(root:)
-      @root = File.join(Pathname.new(root).realpath, "")
-    end
-
-    def filter
-      lambda do |path|
-        path.to_s.start_with?(@root)
-      end
-    end
-
-    def file_mapper
-      lambda do |path|
-        path.to_s.sub(@root, "")
-      end
-    end
-
     def changes(merge_base:)
       base_commit, _status = Open3.capture2("git", "merge-base", merge_base, "HEAD")
       patches, _status = Open3.capture2("git", "diff", "--unified=0", base_commit.strip)
