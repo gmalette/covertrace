@@ -1,5 +1,7 @@
 require "coverage"
 require "covertrace/version"
+require "unified_diff"
+require "open3"
 
 module Covertrace
   AlreadyStartedError = Class.new(StandardError)
@@ -104,6 +106,50 @@ module Covertrace
 
     def empty?
       coverage.empty?
+    end
+  end
+
+  class GitDiffer
+    def initialize(root:)
+      @root = File.join(Pathname.new(root).realpath, "")
+    end
+
+    def filter
+      lambda do |path|
+        path.to_s.start_with?(@root)
+      end
+    end
+
+    def mapper
+      lambda do |path|
+        path.to_s.sub(@root, "")
+      end
+    end
+
+    def changes(merge_base:)
+      base_commit, _status = Open3.capture2("git", "merge-base", merge_base, "HEAD")
+      patches, _status = Open3.capture2("git", "diff", "--unified=0", base_commit.strip)
+      patches
+        .split(/^diff.*?$\nindex.*?$/m)
+        .reject(&:empty?)
+        .map(&:strip)
+        .map { |diff_content| UnifiedDiff.parse(diff_content) }
+        .map do |diff|
+          diff.chunks.map do |chunk|
+            file = diff.original_file.split("/", 2).last
+            original_range = bound_range(chunk.original_range)
+            modified_range = bound_range(chunk.modified_range)
+            [file, { original_range: original_range, modified_range: modified_range }]
+          end.compact
+        end
+        .flatten(1)
+        .to_h
+    end
+
+    private
+
+    def bound_range(range)
+      Range.new([range.begin - 1, 0].max, [range.end - 1, 0].max, range.exclude_end?)
     end
   end
 end

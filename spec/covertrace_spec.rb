@@ -110,3 +110,81 @@ describe Covertrace::Dependencies do
     end
   end
 end
+
+describe Covertrace::GitDiffer do
+  subject { Covertrace::GitDiffer.new(root: ".") }
+
+  describe "#changes" do
+    before do
+      allow(Open3).to receive(:capture2)
+        .with("git", "merge-base", "origin/master", "HEAD")
+        .and_return(["SHA", success])
+      allow(Open3).to receive(:capture2)
+        .with("git", "diff", "--unified=0", "SHA")
+        .and_return([patch, success])
+    end
+
+    let(:success) { double("Process::Status", success?: true) }
+
+    let(:patch) do
+      <<-PATCH
+diff --git a/covertrace.gemspec b/covertrace.gemspec
+index 78389d4..069c282 100644
+--- a/covertrace.gemspec
++++ b/covertrace.gemspec
+@@ -29,0 +30,2 @@ Gem::Specification.new do |spec|
++  spec.add_dependency "unified_diff", "~> 0.3"
++
+diff --git a/lib/covertrace.rb b/lib/covertrace.rb
+index e8e7e32..a76bcae 100644
+--- a/lib/covertrace.rb
++++ b/lib/covertrace.rb
+@@ -2,0 +3 @@ require "covertrace/version"
++require "unified_diff"
+@@ -108,0 +110,3 @@ module Covertrace
++
++  class GitDiff
++  end
+diff --git a/spec/covertrace_spec.rb b/spec/covertrace_spec.rb
+index 5cdd69f..9a9aad4 100644
+--- a/spec/covertrace_spec.rb
++++ b/spec/covertrace_spec.rb
+@@ -112,0 +113,3 @@ end
++
++describe Covertrace::GitDiff do
++end
+      PATCH
+    end
+
+    it "returns an array of changes where line indices start at 0" do
+      diffs = subject.changes(merge_base: "origin/master")
+      expect(diffs).to eq(
+        "covertrace.gemspec" => {
+          original_range: (28...28),
+          modified_range: (29...31),
+        },
+        "lib/covertrace.rb" => {
+          original_range: (107...107),
+          modified_range: (109...112),
+        },
+        "spec/covertrace_spec.rb" => {
+          original_range: (111...111),
+          modified_range: (112...115),
+        },
+      )
+    end
+  end
+
+  describe "#filter" do
+    it "returns a lambda that filters out paths not under the root" do
+      expect(subject.filter.call("/var/log/toto.rb")).to eq(false)
+      expect(subject.filter.call(Pathname.new(".").join("spec").realpath)).to eq(true)
+    end
+  end
+
+  describe "#mapper" do
+    it "returns a lambda that removes the root from the path" do
+      expect(subject.mapper.call(Pathname.new(".").join("spec").realpath)).to eq("spec")
+    end
+  end
+end
