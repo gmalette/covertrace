@@ -82,6 +82,23 @@ describe Covertrace::Tracer do
         )
       end
     end
+
+    context "with mapping" do
+      let(:config) { Covertrace::Config.new(file_mapper: ->(file) { "a" }) }
+
+      it "maps file names" do
+        expect(subject.dependencies).to eq(
+          Covertrace::Dependencies.new(
+            hash: {
+              "a" => test_class_coverage.map.with_index do |coverage, index|
+                next [] unless coverage.to_i > 0
+                ["toto"]
+              end,
+            },
+          )
+        )
+      end
+    end
   end
 end
 
@@ -182,9 +199,9 @@ index 5cdd69f..9a9aad4 100644
     end
   end
 
-  describe "#mapper" do
+  describe "#file_mapper" do
     it "returns a lambda that removes the root from the path" do
-      expect(subject.mapper.call(Pathname.new(".").join("spec").realpath)).to eq("spec")
+      expect(subject.file_mapper.call(Pathname.new(".").join("spec").realpath)).to eq("spec")
     end
   end
 end

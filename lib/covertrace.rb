@@ -6,15 +6,18 @@ require "open3"
 module Covertrace
   AlreadyStartedError = Class.new(StandardError)
 
-  Config = Struct.new(:filter_proc) do
-    def initialize(filter: ->(_){ true })
+  Config = Struct.new(:filter_proc, :file_mapper_proc) do
+    def initialize(filter: ->(_){ true }, file_mapper: ->(path) { path })
       self.filter_proc = filter
+      self.file_mapper_proc = file_mapper
     end
 
-    def filter(results)
-      results.select do |(file_name, _coverage)|
+    def filter(file_name)
         filter_proc.call(file_name)
-      end
+    end
+
+    def map_file_name(file_name)
+      file_mapper_proc.call(file_name)
     end
   end
 
@@ -30,8 +33,12 @@ module Covertrace
         value = block.call
       end
 
-      results = Result.new(config.filter(results))
-      @result_set.record(name, results)
+      results = results.map do |file_name, coverage|
+        next unless config.filter(file_name)
+        [config.map_file_name(file_name), coverage]
+      end.compact.to_h
+
+      @result_set.record(name, Result.new(results))
       value
     end
 
@@ -57,7 +64,7 @@ module Covertrace
       state_before = Coverage.peek_result
       block.call
       state_after = Coverage.peek_result
-      filtered = config.filter(state_after).map do |file_name, coverage_after|
+      filtered = state_after.map do |file_name, coverage_after|
         coverage_before = state_before.fetch(file_name, [])
         next [file_name, coverage_after.map { nil }] if coverage_after == coverage_before
         diffs = coverage_after.zip(coverage_before).map do |after, before|
@@ -120,7 +127,7 @@ module Covertrace
       end
     end
 
-    def mapper
+    def file_mapper
       lambda do |path|
         path.to_s.sub(@root, "")
       end
