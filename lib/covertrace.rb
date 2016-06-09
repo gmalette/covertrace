@@ -17,9 +17,10 @@ module Covertrace
     def default_filter
       root = @root.to_s
       ignored = %w(spec test vendor).map do |dir|
-
-        @root.join("#{dir}/").to_s
-      end
+        dir = @root.join("#{dir}/")
+        next unless dir.exist?
+        dir.to_s
+      end.compact
       lambda do |path|
         path.to_s.start_with?(root) && ignored.none? { |dir| path.to_s.start_with?(dir) }
       end
