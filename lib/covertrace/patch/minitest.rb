@@ -16,7 +16,7 @@ end
 
 class Covertrace::Reporter < Minitest::AbstractReporter
   def report
-    Covertrace.record
+    Covertrace.call_after_suite
   end
 end
 

@@ -11,15 +11,19 @@ module Covertrace
     @tracer = Tracer.new(config: Config.new(**options))
   end
 
-  attr_reader :tracer
+  attr_reader(
+    :after_suite_callbacks,
+    :tracer,
+  )
 
-  def recorder(&block)
-    @recorders ||= []
-    @recorders << block
+  @after_suite_callbacks = []
+
+  def after_suite(&block)
+    @after_suite_callbacks << block
   end
 
-  def record
-    @recorders.each { |recorder| recorder.call(tracer.dependencies) }
+  def call_after_suite
+    @after_suite_callbacks.each { |callback| callback.call(tracer.dependencies) }
   end
 
   AlreadyStartedError = Class.new(StandardError)

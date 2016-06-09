@@ -19,6 +19,6 @@ module Covertrace::S3
   end
 end
 
-Covertrace.recorder do |dependencies|
+Covertrace.after_suite do |dependencies|
   Covertrace::S3.put_object(dependencies.to_json)
 end
