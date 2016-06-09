@@ -7,22 +7,27 @@ module Covertrace
   AlreadyStartedError = Class.new(StandardError)
 
   Config = Struct.new(:filter_proc, :file_mapper_proc) do
-    def initialize(root:, filter: default_filter, file_mapper: default_file_mapper)
-      @root = File.join(Pathname.new(root).realpath, "")
+    def initialize(root:, filter: nil, file_mapper: nil)
+      @root = Pathname.new(File.join(Pathname.new(root).realpath, ""))
 
-      self.filter_proc = filter
-      self.file_mapper_proc = file_mapper
+      self.filter_proc = filter || default_filter
+      self.file_mapper_proc = file_mapper || default_file_mapper
     end
 
     def default_filter
+      root = @root.to_s
+      ignored = %w(spec test vendor).map do |dir|
+
+        @root.join("#{dir}/").to_s
+      end
       lambda do |path|
-        path.to_s.start_with?(@root)
+        path.to_s.start_with?(root) && ignored.none? { |dir| path.to_s.start_with?(dir) }
       end
     end
 
     def default_file_mapper
       lambda do |path|
-        path.to_s.sub(@root, "")
+        path.to_s.sub(@root.to_s, "")
       end
     end
 
