@@ -1,7 +1,10 @@
-gem 'aws-sdk', '~> 2.3'
+gem "aws-sdk", "~> 2.3"
+require "net/http"
 
 module Covertrace::S3
   extend self
+
+  RemoteFileNotFound = Class.new(StandardError)
 
   attr_accessor(
     :bucket,
