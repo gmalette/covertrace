@@ -20,6 +20,31 @@ module Covertrace::S3
       body: json,
     )
   end
+
+  def http_download
+    content = cache("/tmp/coverage-#{file_path}.json") do
+      url = "http://#{bucket}.s3-website-#{region}.amazonaws.com/#{bucket}/#{file_path}.json"
+      resp = Net::HTTP.get_response(URI(url))
+
+      raise(RemoteFileNotFound, url) unless resp.is_a?(Net::HTTPSuccess)
+
+      resp.body
+    end
+
+    JSON.parse(content)
+  end
+
+  private
+
+  def cache(filename, &block)
+    file = Pathname.new(filename)
+
+    if !file.exist?
+      file.write(block.call)
+    end
+
+    file.read
+  end
 end
 
 Covertrace.after_suite do |dependencies|
