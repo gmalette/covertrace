@@ -11,10 +11,7 @@ module Covertrace
     @tracer = Tracer.new(config: Config.new(**options))
   end
 
-  attr_reader(
-    :after_suite_callbacks,
-    :tracer,
-  )
+  attr_reader :after_suite_callbacks
 
   @after_suite_callbacks = []
 
@@ -24,6 +21,15 @@ module Covertrace
 
   def call_after_suite
     @after_suite_callbacks.each { |callback| callback.call(tracer.dependencies) }
+  end
+
+  def tracer
+    raise "Coverage.start hasn't been called" unless @tracer
+    @tracer
+  end
+
+  def trace(name:, &block)
+    tracer.trace(name: name, &block)
   end
 
   AlreadyStartedError = Class.new(StandardError)
