@@ -1,5 +1,7 @@
 require "covertrace"
 
+Coverage.start
+
 module Covertrace::Minitest
   def run_one_method(klass, method_name, reporter)
     Covertrace.trace(name: "#{klass}##{method_name}") do
