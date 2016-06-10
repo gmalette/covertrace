@@ -4,16 +4,58 @@ require "unified_diff"
 require "open3"
 
 module Covertrace
+  extend self
+
+  def start(**options)
+    Coverage.start
+    @tracer = Tracer.new(config: Config.new(**options))
+  end
+
+  attr_reader(
+    :after_suite_callbacks,
+    :tracer,
+  )
+
+  @after_suite_callbacks = []
+
+  def after_suite(&block)
+    @after_suite_callbacks << block
+  end
+
+  def call_after_suite
+    @after_suite_callbacks.each { |callback| callback.call(tracer.dependencies) }
+  end
+
   AlreadyStartedError = Class.new(StandardError)
 
   Config = Struct.new(:filter_proc, :file_mapper_proc) do
-    def initialize(filter: ->(_){ true }, file_mapper: ->(path) { path })
-      self.filter_proc = filter
-      self.file_mapper_proc = file_mapper
+    def initialize(root:, filter: nil, file_mapper: nil)
+      @root = Pathname.new(File.join(Pathname.new(root).realpath, ""))
+
+      self.filter_proc = filter || default_filter
+      self.file_mapper_proc = file_mapper || default_file_mapper
+    end
+
+    def default_filter
+      root = @root.to_s
+      ignored = %w(spec test vendor).map do |dir|
+        dir = @root.join("#{dir}/")
+        next unless dir.exist?
+        dir.to_s
+      end.compact
+      lambda do |path|
+        path.to_s.start_with?(root) && ignored.none? { |dir| path.to_s.start_with?(dir) }
+      end
+    end
+
+    def default_file_mapper
+      lambda do |path|
+        path.to_s.sub(@root.to_s, "")
+      end
     end
 
     def filter(file_name)
-        filter_proc.call(file_name)
+      filter_proc.call(file_name)
     end
 
     def map_file_name(file_name)
@@ -106,6 +148,10 @@ module Covertrace
         .flatten
         .uniq
     end
+
+    def to_json
+      hash.to_json
+    end
   end
 
   ResultSet = Struct.new(:results) do
@@ -129,22 +175,6 @@ module Covertrace
   end
 
   class GitDiffer
-    def initialize(root:)
-      @root = File.join(Pathname.new(root).realpath, "")
-    end
-
-    def filter
-      lambda do |path|
-        path.to_s.start_with?(@root)
-      end
-    end
-
-    def file_mapper
-      lambda do |path|
-        path.to_s.sub(@root, "")
-      end
-    end
-
     def changes(merge_base:)
       base_commit, _status = Open3.capture2("git", "merge-base", merge_base, "HEAD")
       patches, _status = Open3.capture2("git", "diff", "--unified=0", base_commit.strip)
