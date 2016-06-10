@@ -200,7 +200,7 @@ module Covertrace
 
         relevant_changes = []
 
-        repo.diff("HEAD", merge_base_commit).each_patch do |patch|
+        repo.diff_workdir(merge_base_commit).each_patch do |patch|
           old_file_name = patch.delta.old_file[:path]
           new_file_name = patch.delta.new_file[:path]
           patch.each_hunk do |hunk|
