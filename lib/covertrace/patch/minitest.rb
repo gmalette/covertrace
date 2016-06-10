@@ -1,4 +1,4 @@
-require 'covertrace'
+require "covertrace"
 
 module Covertrace::Minitest
   def run_one_method(klass, method_name, reporter)
