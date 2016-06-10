@@ -1,6 +1,8 @@
 require "coverage"
 require "covertrace/version"
-require "unified_diff"
+require "covertrace/runner/abstract_runner"
+require "covertrace/runner/rspec"
+require "rugged"
 require "open3"
 
 module Covertrace
@@ -174,31 +176,60 @@ module Covertrace
     end
   end
 
-  class GitDiffer
-    def changes(merge_base:)
-      base_commit, _status = Open3.capture2("git", "merge-base", merge_base, "HEAD")
-      patches, _status = Open3.capture2("git", "diff", "--unified=0", base_commit.strip)
-      patches
-        .split(/^diff.*?$\nindex.*?$/m)
-        .reject(&:empty?)
-        .map(&:strip)
-        .map { |diff_content| UnifiedDiff.parse(diff_content) }
-        .map do |diff|
-          diff.chunks.map do |chunk|
-            file = diff.original_file.split("/", 2).last
-            original_range = bound_range(chunk.original_range)
-            modified_range = bound_range(chunk.modified_range)
-            [file, { original_range: original_range, modified_range: modified_range }]
-          end.compact
-        end
-        .flatten(1)
-        .to_h
+  FileDiff = Struct.new(:old_file_name, :new_file_name, :old_line_range, :new_line_range, :hunk_core) do
+    def initialize(old_file_name:, new_file_name:, old_line_range:, new_line_range:, hunk_core:)
+      self.old_file_name = old_file_name
+      self.new_file_name = new_file_name
+      self.old_line_range = old_line_range
+      self.new_line_range = new_line_range
+      self.hunk_core = hunk_core
     end
+  end
 
-    private
+  class GitChanges
+    class << self
+      def changes(merge_base:, root:)
+        repo = Rugged::Repository.new(root)
+        merge_base_commit = repo.lookup(repo.merge_base("HEAD", merge_base))
 
-    def bound_range(range)
-      Range.new([range.begin - 1, 0].max, [range.end - 1, 0].max, range.exclude_end?)
+        relevant_changes = []
+
+        repo.diff("HEAD", merge_base_commit).each_patch do |patch|
+          old_file_name = patch.delta.old_file[:path]
+          new_file_name = patch.delta.new_file[:path]
+          patch.each_hunk do |hunk|
+            hunk_core = hunk.lines
+              .drop_while { |line| !line.addition? && !line.deletion? }
+              .reverse
+              .drop_while { |line| !line.addition? && !line.deletion? }
+              .reverse
+
+            relevant_changes << FileDiff.new(
+              old_file_name: old_file_name,
+              new_file_name: new_file_name,
+              old_line_range: line_range(hunk_core, :old),
+              new_line_range: line_range(hunk_core, :new),
+              hunk_core: hunk_core,
+            )
+          end
+        end
+
+        relevant_changes
+      end
+
+      private
+
+      def line_range(lines, state)
+        predicate = state == :new ? :addition? : :deletion?
+        line_method = state == :new ? :new_lineno : :old_lineno
+        lines = lines.select(&predicate)
+
+        return nil if lines.empty?
+        Range.new(
+          lines.first.public_send(line_method) - 1,
+          lines.last.public_send(line_method) - 1,
+        )
+      end
     end
   end
 end
